@@ -1,5 +1,5 @@
 from typing import Any, Dict, Iterable, List
-from datetime import datetime
+from datetime import date, datetime
 import copy
 
 class Logger():
@@ -59,12 +59,16 @@ class MetaNode():
         self._node_type = node_type
         self._start  = None
         self._end = None
+    def set_start(self, value):
+        self._start = value
+    def set_end(self, value):
+        self._end = value
     def to_dict(self):
         return {
             'name': self._name,
             'node_type': self._node_type,
-            'start': self._start,
-            'end': self._end
+            'start': datetime.timestamp(self._start) if isinstance(self._start, datetime) else self._start,
+            'end': datetime.timestamp(self._end) if isinstance(self._end, datetime) else self._end
         }
 class Node(MetaNode):
     def __init__(self, name: str, node_type: str) -> None:
@@ -124,10 +128,10 @@ class Tracks():
         else: 
             _list[nodeKey[-1]] = node 
     def getNode(self, nodeKey: List[int]):
-        list = self._tracks
+        _list = self._tracks
         for k in nodeKey:
             try:
-                _list = _list.get(k)
+                _list = _list.get(k) if isinstance(_list, dict) else _list.tracks.get(k)
             except BaseException as e:
                 raise ValueError(f'Index "{k}" not found in {_list}')
         return _list
@@ -177,6 +181,8 @@ class Transporter():
         self._execution_control = execution_control
         self._id = id ## disabled
         self._child_id = child_id ### Quando se tornar filhos, ele tem um ID... 
+        self._start = None
+        self._end = None
     @property
     def execution_control(self):
         return self._execution_control
@@ -186,6 +192,7 @@ class Transporter():
             _inst = Node(articulator.name, articulator.type)
             _prev = None if articulator.type == 'BlockMode' else dict()
             _inst.set_tracks_position(fns_qnt, _prev)
+            _inst.set_start(datetime.now())
         else:
             ## the children will use this.
             _inst = NodeFunctions(articulator.name, articulator.type)
@@ -206,13 +213,25 @@ class Transporter():
         _id_list = self._id[:] if not pid else pid
         return Transporter(PipeData(copy.deepcopy(d)), self._data_store, self._logger, self._execution_control, _id_list, num)
     def start(self):
-        pass
+        self._start = datetime.now()
+        _id = self._id[:]
+        if self._child_id != None: _id = _id + [self._child_id]
+        node = self._execution_control._tracks.getNode(_id)
+        node.set_start(self._start)
+        
     
     def end(self):
-        pass
-
+        self._end = datetime.now()
+        _id = self._id[:]
+        if self._child_id != None: _id = _id + [self._child_id]
+        node = self._execution_control._tracks.getNode(_id)
+        node.set_end(self._end)
+        
+    
     def check_out(self):
         self._id = self._id[:-1]
+        node = self._execution_control._tracks.getNode(self._id)
+        node.set_end(datetime.now())
     
     def deliver(self):
         return self._pipe_data.data, PipeTransporterControl(), self._data_store, self._logger

@@ -7,6 +7,10 @@ from rhprocessor.processor import BlockMode, FluxMode, Execute, Processor
 def carregar(dada: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: Logger):
     return [0, 1, 2]
 
+def selecionar(data: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: Logger):
+    return data[0]
+
+
 class Soma():
     def __init__(self, num = 10) -> None:
         self._num = num
@@ -41,6 +45,12 @@ proc = Processor(
             Execute(SomaFluxo(5)),
             Execute(SubtraiFluxo(1))
         )
+    ),
+    BlockMode(
+        Execute(selecionar)
+    ),
+    FluxMode(
+        Execute(SomaFluxo(100))
     )
 )
 
