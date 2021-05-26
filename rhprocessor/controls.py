@@ -21,30 +21,30 @@ class DataStore():
     def getData(self, key):
         return self._data.get(key)
 
-class PipeInterrupt():
+class MetaError():
     def __init__(self, msg):
         self._msg = msg
     @property
     def msg(self):
         return self._msg
 
-class PipeStop():
-    def __init__(self, msg):
-        self._msg = msg
-    @property
-    def msg(self):
-        return self._msg
+class PipeInterrupt(MetaError):
+    pass
 
-class PipeError():
-    def __init__(self, msg):
-        self._msg = msg
-    @property
-    def msg(self):
-        return self._msg
+class PipeStop(MetaError):
+    pass
+
+class PipeError(MetaError):
+    pass
+
+class FunctionError(MetaError):
+    pass
 
 class PipeTransporterControl():
-    def error(msg = 'PipeError'):
+    def pipe_error(self, msg = 'PipeError'):
         return PipeError(msg)
+    def function_error(self, msg):
+        return FunctionError(msg = 'User Function Error')
 
 class PipeData():
     def __init__(self, data = None):
@@ -53,22 +53,35 @@ class PipeData():
     def data(self):
         return self._data
 
+
+
 class MetaNode():
     def __init__(self, name: str, node_type: str) -> None:
         self._name = name
         self._node_type = node_type
         self._start  = None
         self._end = None
+        self._AWAITING = 'awaiting'
+        self._SUCCESS = 'success'
+        self._ERROR = 'error',
+        self._IGNORED = 'ignored'
+        self._RUNNING = 'running'
+        self._status = self._AWAITING
     def set_start(self, value):
         self._start = value
     def set_end(self, value):
         self._end = value
+    def set_status(self, status):
+        if status not in [self._AWAITING, self._SUCCESS, self._ERROR, self._IGNORED, self._RUNNING]:
+            raise ValueError('Status not valid')
+        self._status = status
     def to_dict(self):
         return {
             'name': self._name,
             'node_type': self._node_type,
             'start': datetime.timestamp(self._start) if isinstance(self._start, datetime) else self._start,
-            'end': datetime.timestamp(self._end) if isinstance(self._end, datetime) else self._end
+            'end': datetime.timestamp(self._end) if isinstance(self._end, datetime) else self._end,
+            'status': self._status
         }
 class Node(MetaNode):
     def __init__(self, name: str, node_type: str) -> None:
@@ -150,29 +163,6 @@ class ExecutionControl():
     def tracks(self):
         return self._tracks
 
-    '''
-    funcao
-        nome_execucao
-        numero_exeecucao,
-        inicio
-        fim
-        logs []
-
-    Node
-        nome_execucao
-        numerO-execucao
-        inicio
-        fim
-        Execucoes =>
-            Bloco [Funcoes]
-            Fluxo [[Funcoes], [Funcoes], [Funcoes]...] Um para cada dado
-            Paralelo [Articulador, Articulador...]
-    
-
-    
-    '''
-    pass
-
 class Transporter():
     def __init__(self, pipe_data: PipeData, data_store: DataStore, logger: Logger, execution_control: ExecutionControl, id = [-1], child_id = None):
         self._pipe_data = pipe_data
@@ -193,6 +183,7 @@ class Transporter():
             _prev = None if articulator.type == 'BlockMode' else dict()
             _inst.set_tracks_position(fns_qnt, _prev)
             _inst.set_start(datetime.now())
+            _inst.set_status(_inst._RUNNING)
         else:
             ## the children will use this.
             _inst = NodeFunctions(articulator.name, articulator.type)
@@ -218,6 +209,7 @@ class Transporter():
         if self._child_id != None: _id = _id + [self._child_id]
         node = self._execution_control._tracks.getNode(_id)
         node.set_start(self._start)
+        node.set_status(node._RUNNING)
         
     
     def end(self):
@@ -226,12 +218,14 @@ class Transporter():
         if self._child_id != None: _id = _id + [self._child_id]
         node = self._execution_control._tracks.getNode(_id)
         node.set_end(self._end)
+        node.set_status(node._SUCCESS)
         
     
     def check_out(self):
         self._id = self._id[:-1]
         node = self._execution_control._tracks.getNode(self._id)
         node.set_end(datetime.now())
+        node.set_status(node._SUCCESS)
     
     def deliver(self):
         return self._pipe_data.data, PipeTransporterControl(), self._data_store, self._logger

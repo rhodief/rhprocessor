@@ -1,8 +1,9 @@
+from copy import Error
 from types import FunctionType
 from typing import Any, List
 from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool as ThreadPool
-from .controls import DataStore, ExecutionControl, Logger, PipeData, Transporter
+from .controls import DataStore, ExecutionControl, Logger, MetaError, PipeData, PipeTransporterControl, Transporter
 import traceback
 
 class Articulators():
@@ -39,15 +40,26 @@ class Execute():
         return self._type
 
     def __call__(self, transporter: Transporter) -> Transporter:
+        if isinstance(transporter.data().data, MetaError):
+            return transporter
         transporter.check_in(self)
         transporter.start()
-        transporter.receive_data(self._function(*transporter.deliver(), **self._params))
+        try:
+            transporter.receive_data(self._function(*transporter.deliver(), **self._params))
+        except BaseException as e:
+            print('############### Function Error ###############')
+            print(f'## Function "{self._function.__name__}", node "{transporter._id}": {e}')
+            print('@@ Traceback below: ')
+            traceback.print_exc()
+            transporter.receive_data(PipeTransporterControl().function_error(f'Error on Node {transporter._id}'))
         ## Finaliza transporter
         transporter.end()
         return transporter
 
 class BlockMode(Articulators):
     def __call__(self, transporter: Transporter) -> Transporter:
+        if isinstance(transporter.data().data, MetaError):
+            raise Error(transporter.data().data.msg)
         transporter.check_in(self, len(self._articulators))
         for art in self._articulators:
             try:
@@ -61,6 +73,8 @@ class BlockMode(Articulators):
 
 class FluxMode(Articulators):
     def __call__(self, transporter: Transporter) -> Transporter:
+        if isinstance(transporter.data().data, MetaError):
+            raise Error(transporter.data().data.msg)
         transporter.check_in(self, len(self._articulators))
         chld_trans = transporter.make_children()
         for chld in chld_trans:
@@ -90,6 +104,8 @@ class ParallelMode(Articulators):
         pool.join()
     
     def __call__(self, transporter: Transporter) -> Transporter:
+        if isinstance(transporter.data().data, MetaError):
+            raise Error(transporter.data().data.msg)
         len_articulator = len(self._articulators)
         transporter.check_in(self, len_articulator)
         branches = transporter.makeCopy(len_articulator)

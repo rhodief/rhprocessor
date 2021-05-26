@@ -3,8 +3,10 @@ from rhprocessor.processor import ParallelMode
 from rhprocessor.controls import DataStore, Logger, PipeTransporterControl
 from rhprocessor.processor import Processor
 from rhprocessor.processor import BlockMode, FluxMode, Execute, Processor
+import time
 
 def carregar(dada: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: Logger):
+    raise Exception('kkkkk')
     return [0, 1, 2]
 
 def selecionar(data: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: Logger):
@@ -60,3 +62,7 @@ proc()
 import json
 print('Retorno', proc.data())
 print('Controle', json.dumps(proc._transporter.execution_control.tracks.to_dict()))
+
+### Fazer uma métodos em transporter para settar um erro...
+###### Ele vai acessar o node respectivo para colocar o status erro.. 
+###### Ele pode propagar-se por todo o pipeline e settar os respectivos status.. 
