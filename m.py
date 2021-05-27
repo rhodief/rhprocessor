@@ -6,7 +6,6 @@ from rhprocessor.processor import BlockMode, FluxMode, Execute, Processor
 import time
 
 def carregar(dada: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: Logger):
-    raise Exception('kkkkk')
     return [0, 1, 2]
 
 def selecionar(data: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: Logger):
@@ -57,7 +56,6 @@ proc = Processor(
 )
 
 proc()
-
 
 import json
 print('Retorno', proc.data())

@@ -1,6 +1,7 @@
 from typing import Any, Dict, Iterable, List
 from datetime import date, datetime
 import copy
+from enum import Enum, auto
 
 class Logger():
     def log(self, msg):
@@ -53,7 +54,12 @@ class PipeData():
     def data(self):
         return self._data
 
-
+class NodeStatus(Enum):
+    AWAITING = auto()
+    SUCCESS = auto()
+    ERROR = auto()
+    IGNORED = auto()
+    RUNNING = auto()
 
 class MetaNode():
     def __init__(self, name: str, node_type: str) -> None:
@@ -61,18 +67,14 @@ class MetaNode():
         self._node_type = node_type
         self._start  = None
         self._end = None
-        self._AWAITING = 'awaiting'
-        self._SUCCESS = 'success'
-        self._ERROR = 'error',
-        self._IGNORED = 'ignored'
-        self._RUNNING = 'running'
-        self._status = self._AWAITING
+        self._status = NodeStatus.AWAITING
     def set_start(self, value):
         self._start = value
     def set_end(self, value):
         self._end = value
     def set_status(self, status):
-        if status not in [self._AWAITING, self._SUCCESS, self._ERROR, self._IGNORED, self._RUNNING]:
+        if status not in [ns for ns in NodeStatus]:
+            print('Status', status)
             raise ValueError('Status not valid')
         self._status = status
     def to_dict(self):
@@ -81,7 +83,7 @@ class MetaNode():
             'node_type': self._node_type,
             'start': datetime.timestamp(self._start) if isinstance(self._start, datetime) else self._start,
             'end': datetime.timestamp(self._end) if isinstance(self._end, datetime) else self._end,
-            'status': self._status
+            'status': self._status.name
         }
 class Node(MetaNode):
     def __init__(self, name: str, node_type: str) -> None:
@@ -173,6 +175,7 @@ class Transporter():
         self._child_id = child_id ### Quando se tornar filhos, ele tem um ID... 
         self._start = None
         self._end = None
+        self._error = isinstance(self._pipe_data.data, MetaError)
     @property
     def execution_control(self):
         return self._execution_control
@@ -183,7 +186,7 @@ class Transporter():
             _prev = None if articulator.type == 'BlockMode' else dict()
             _inst.set_tracks_position(fns_qnt, _prev)
             _inst.set_start(datetime.now())
-            _inst.set_status(_inst._RUNNING)
+            _inst.set_status(NodeStatus.RUNNING)
         else:
             ## the children will use this.
             _inst = NodeFunctions(articulator.name, articulator.type)
@@ -191,6 +194,8 @@ class Transporter():
         self._execution_control._tracks.addNode(_id, _inst)
         if fns_qnt: self._id.append(-1)
     def make_children(self, qnt = None):
+        if self._error or isinstance(self._pipe_data.data, MetaError):
+            return [self._new_instance(d, i) for i, d in enumerate([self._pipe_data.data])]
         if not isinstance(self._pipe_data.data, Iterable):
             raise ValueError('Data is not iterable')
         return [self._new_instance(d, i) for i, d in enumerate(self._pipe_data.data)]
@@ -209,23 +214,23 @@ class Transporter():
         if self._child_id != None: _id = _id + [self._child_id]
         node = self._execution_control._tracks.getNode(_id)
         node.set_start(self._start)
-        node.set_status(node._RUNNING)
+        node.set_status(NodeStatus.RUNNING)
         
     
-    def end(self):
+    def end(self, status = NodeStatus.SUCCESS):
         self._end = datetime.now()
         _id = self._id[:]
         if self._child_id != None: _id = _id + [self._child_id]
         node = self._execution_control._tracks.getNode(_id)
         node.set_end(self._end)
-        node.set_status(node._SUCCESS)
+        node.set_status(status)
         
     
-    def check_out(self):
+    def check_out(self, status = NodeStatus.SUCCESS):
         self._id = self._id[:-1]
         node = self._execution_control._tracks.getNode(self._id)
         node.set_end(datetime.now())
-        node.set_status(node._SUCCESS)
+        node.set_status(status)
     
     def deliver(self):
         return self._pipe_data.data, PipeTransporterControl(), self._data_store, self._logger
@@ -239,7 +244,13 @@ class Transporter():
 
     def data(self):
         return self._pipe_data
-    
+    def is_on_error(self) -> bool:
+        return self._error
+    def function_error(self, msg = 'User Error'):
+        _err = PipeTransporterControl().function_error(msg)
+        self.receive_data(_err)
+        self._error = True
+
 
 
 class ProcessorControls():
