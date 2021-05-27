@@ -3,11 +3,59 @@ from datetime import date, datetime
 import copy
 from enum import Enum, auto
 
-class Logger():
+
+class ILog():
+    def __init__(self, txt) -> None:
+        self._txt = txt
+        self._dt = datetime.now()
+    @property
+    def txt(self):
+        return self._txt
+    @property
+    def dt(self):
+        return self._dt
+    def to_dict(self):
+        return {
+            'txt': self._txt,
+            'dt': datetime.timestamp(self._dt)
+        }
+
+class ULogger():
+    def __init__(self, obj: List[Dict[str, Any]], _cb_fn = None) -> None:
+        self._obj = obj
+        self._fn = _cb_fn
     def log(self, msg):
-        pass
+        _o = ILog(msg)
+        self._obj.append(_o)
+        self._notify()
+
     def logProgress(self, progress, total, msg):
         pass
+    def _notify(self):
+        if callable(self._fn): self._fn()
+
+class Logger():
+    def __init__(self) -> None:
+        self._store: Dict[str, List[Dict[str, Any]]] = {}
+        self._fn = None
+    def get_log_obj_from_string(self, idstring):
+        return self._store.get(idstring, None)
+    def get_log_obj(self, key: List[int]):
+        _id = self._id_string(key)
+        return self._store.get(_id, None)
+    def _id_string(self, id):
+        return '.'.join([str(i) for i in id])
+    def u_logger(self, id: List[int]):
+        _id = self._id_string(id)
+        self._store[_id] = []
+        return ULogger(self.get_log_obj_from_string(_id), self._fn)
+    def get_all_logs(self):
+        return {k: [l.to_dict() for l in v] for k, v in self._store.items()}
+    def on_log(self, fn):
+        self._fn = fn
+    
+    
+    
 
 class DataStore():
     def __init__(self, data = {}, protected = True):
@@ -155,16 +203,21 @@ class Tracks():
 
 class ExecutionControl():
     def __init__(self, execution_data: dict = {}):
-        self._currentNode: List[int] = [-1] ## stopped. 
+        self._current_node = {}
         self._tracks = Tracks()
     
     @property
-    def currentNode(self):
-        return self._currentNode
+    def current_node(self):
+        return self._current_node
     @property
     def tracks(self):
         return self._tracks
-
+    def add_execution(self, node_id: List[int]):
+        self._current_node[self._get_key(node_id)] = node_id
+    def remove_execution(self, node_id: List[int]):
+        self._current_node.pop(self._get_key(node_id), None)
+    def _get_key(self, node_id: List[int]):
+        return '.'.join([str(n) for n in node_id])
 class Transporter():
     def __init__(self, pipe_data: PipeData, data_store: DataStore, logger: Logger, execution_control: ExecutionControl, id = [-1], child_id = None):
         self._pipe_data = pipe_data
@@ -176,9 +229,13 @@ class Transporter():
         self._start = None
         self._end = None
         self._error = isinstance(self._pipe_data.data, MetaError)
+        self._on_move_fn = None
     @property
     def execution_control(self):
         return self._execution_control
+    @property
+    def logger(self):
+        return self._logger
     def check_in(self, articulator, fns_qnt = 0):
         self._id[-1] += 1
         if fns_qnt:
@@ -193,6 +250,7 @@ class Transporter():
         _id = self._id if self._child_id == None else self._id + [self._child_id]
         self._execution_control._tracks.addNode(_id, _inst)
         if fns_qnt: self._id.append(-1)
+        self._notify()
     def make_children(self, qnt = None):
         if self._error or isinstance(self._pipe_data.data, MetaError):
             return [self._new_instance(d, i) for i, d in enumerate([self._pipe_data.data])]
@@ -215,6 +273,8 @@ class Transporter():
         node = self._execution_control._tracks.getNode(_id)
         node.set_start(self._start)
         node.set_status(NodeStatus.RUNNING)
+        self._execution_control.add_execution(_id)
+        self._notify()
         
     
     def end(self, status = NodeStatus.SUCCESS):
@@ -224,6 +284,8 @@ class Transporter():
         node = self._execution_control._tracks.getNode(_id)
         node.set_end(self._end)
         node.set_status(status)
+        self._execution_control.remove_execution(_id)
+        self._notify()
         
     
     def check_out(self, status = NodeStatus.SUCCESS):
@@ -231,9 +293,16 @@ class Transporter():
         node = self._execution_control._tracks.getNode(self._id)
         node.set_end(datetime.now())
         node.set_status(status)
+        self._notify()
+
+    def on_move(self, fn):
+        self._on_move_fn = fn
+        self._logger.on_log(fn)
     
     def deliver(self):
-        return self._pipe_data.data, PipeTransporterControl(), self._data_store, self._logger
+        _id = self._id[:]
+        if self._child_id != None: _id = _id + [self._child_id]
+        return self._pipe_data.data, PipeTransporterControl(), self._data_store, self._logger.u_logger(_id)
     def receive_data(self, data: Any):
         if isinstance(data, PipeError) or isinstance(data, PipeInterrupt) or isinstance(data, PipeStop):
             self._pipe_data = data
@@ -250,7 +319,8 @@ class Transporter():
         _err = PipeTransporterControl().function_error(msg)
         self.receive_data(_err)
         self._error = True
-
+    def _notify(self):
+        if callable(self._on_move_fn): self._on_move_fn()
 
 
 class ProcessorControls():

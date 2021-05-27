@@ -126,10 +126,38 @@ class ParallelMode(Articulators):
         return transporter
 
 
+
+
+import json
+import zmq
+
 class Processor(Articulators):
     def __init__(self, *articulators: List[Articulators]) -> None:
         super().__init__(*articulators)
         self._transporter = Transporter(PipeData(), DataStore(), Logger(), ExecutionControl())
+        context = zmq.Context()
+
+        #  Socket to talk to server
+        print("Connecting to hello world server…")
+        socket = context.socket(zmq.REQ)
+        socket.connect("tcp://localhost:5555")
+        def onChange():
+            ### AQUI EU POSSO FAZER O CAST DE DADOS PARA VER O QUE ESTÁ ACONTECENDO NESTE MOMENTO... 
+            _ids = [v for k, v in self._transporter._execution_control.current_node.items()]
+            for _id in _ids:
+                _ret = {}
+                _lobj = self._transporter.logger.get_log_obj(_id)
+                _ret['id'] = _id
+                _ret['control'] = self._transporter.execution_control.tracks.getNode(_id).to_dict()
+                if _lobj != None: 
+                    _ret['log'] = [l.to_dict() for l in _lobj]
+                _teste = json.dumps(_ret).encode('ascii')
+                socket.send(_teste)
+                #  Get the reply.
+                message = socket.recv()
+                print(f"Received reply [ {message} ]")
+        self._transporter.on_move(onChange)
+
     def __call__(self, transporter: Transporter = None) -> Transporter:
         if transporter: self._transporter = transporter
         _transporter = self._transporter
@@ -142,4 +170,5 @@ class Processor(Articulators):
 
     def data(self):
         return self._transporter.data().data
+    
         
