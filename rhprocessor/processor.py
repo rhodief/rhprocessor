@@ -108,7 +108,7 @@ class ParallelMode(Articulators):
         transporter.check_in(self, len_articulator)
         branches = transporter.makeCopy(len_articulator)
         def iter_thread(i):
-            print('\n Iniciando thread', i, '\n')
+            #print('\n Iniciando thread', i, '\n')
             try:
                 branches[i] = self._articulators[i](branches[i])
             except BaseException as e:
@@ -135,14 +135,10 @@ class Processor(Articulators):
     def __init__(self, *articulators: List[Articulators]) -> None:
         super().__init__(*articulators)
         self._transporter = Transporter(PipeData(), DataStore(), Logger(), ExecutionControl())
-        context = zmq.Context()
-
-        #  Socket to talk to server
-        print("Connecting to hello world server…")
-        socket = context.socket(zmq.REQ)
-        socket.connect("tcp://localhost:5555")
+        self._fn = None
         def onChange():
-            ### AQUI EU POSSO FAZER O CAST DE DADOS PARA VER O QUE ESTÁ ACONTECENDO NESTE MOMENTO... 
+            if  not callable(self._fn):
+                return
             _ids = [v for k, v in self._transporter._execution_control.current_node.items()]
             for _id in _ids:
                 _ret = {}
@@ -152,10 +148,7 @@ class Processor(Articulators):
                 if _lobj != None: 
                     _ret['log'] = [l.to_dict() for l in _lobj]
                 _teste = json.dumps(_ret).encode('ascii')
-                socket.send(_teste)
-                #  Get the reply.
-                message = socket.recv()
-                print(f"Received reply [ {message} ]")
+                self._fn(_teste)
         self._transporter.on_move(onChange)
 
     def __call__(self, transporter: Transporter = None) -> Transporter:
@@ -166,9 +159,12 @@ class Processor(Articulators):
                 _transporter = art(_transporter)
             except BaseException as e:
                 print('Ops ', e)
+                traceback.print_exc()
         self._transporter = _transporter
 
     def data(self):
         return self._transporter.data().data
+    def on_change(self, fn):
+        self._fn = fn
     
         

@@ -261,7 +261,7 @@ class Transporter():
     def makeCopy(self, qnt: int):
         n_id = self._id[:]
         del n_id[-1]
-        return [self._new_instance(self.data().data, pid=(n_id + [i, -1])) for i in list(range(qnt))]
+        return [self._new_instance(self.data().data, pid=(n_id + [i - 1])) for i in list(range(qnt))]
         
     def _new_instance(self, d, num = None, pid = None):
         _id_list = self._id[:] if not pid else pid

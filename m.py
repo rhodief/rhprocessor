@@ -59,16 +59,24 @@ proc = Processor(
         Execute(selecionar)
     ),
     FluxMode(
-        Execute(SomaFluxo(100))
+        Execute(SomaFluxo(100)),
+        Execute(SubtraiFluxo(2))
     )
 )
 
-proc()
+print(proc)
 
-import json
-print('Retorno', proc.data())
-print('Controle', json.dumps(proc._transporter.execution_control.tracks.to_dict()))
-print('Logger', json.dumps(proc._transporter._logger.get_all_logs()))
+def change(_valor):
+    print('Valor', _valor)
+
+#proc.on_change(change)
+
+#proc()
+
+#import json
+#print('Retorno', proc.data())
+#print('Controle', json.dumps(proc._transporter.execution_control.tracks.to_dict()))
+#print('Logger', json.dumps(proc._transporter._logger.get_all_logs()))
 ### Fazer uma métodos em transporter para settar um erro...
 ###### Ele vai acessar o node respectivo para colocar o status erro.. 
 ###### Ele pode propagar-se por todo o pipeline e settar os respectivos status.. 
