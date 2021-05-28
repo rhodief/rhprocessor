@@ -98,8 +98,37 @@ class FluxMode(Articulators):
         transporter.check_out(status=NodeStatus.ERROR if transporter.is_on_error() else NodeStatus.SUCCESS)
         return transporter
 
-class ParallelFluxMode():
-    pass
+class ParallelFluxMode(Articulators):
+    def _cpus(self, one_free=True):
+        one_free = int(one_free)
+        return cpu_count() if cpu_count() < 3 else cpu_count() - one_free
+
+    def _map_thread(self, fn, nlist, n_threads = None):
+        if (not n_threads) or (n_threads<2):
+            n_threads = self._cpus()
+        pool = ThreadPool(n_threads)
+        pool.map(fn, nlist)
+        pool.close()
+        pool.join()
+    
+    def __call__(self, transporter: Transporter) -> Transporter:
+        transporter.check_in(self, len(self._articulators))
+        chld_trans = transporter.make_children()
+        def iter_thread(i):
+            try:
+                for art in self._articulators:
+                    chld_trans[i] = art(chld_trans[i])
+            except BaseException as e:
+                #self._propagarErro(e)
+                print('Ops Eerro Thread', e)
+        try:
+            self._map_thread(fn=iter_thread, nlist=range(len(chld_trans)))
+        except BaseException as e:
+            print('Error , ', e)
+            #traceback.print_exc()
+        transporter.recompose(chld_trans)
+        transporter.check_out(status=NodeStatus.ERROR if transporter.is_on_error() else NodeStatus.SUCCESS)
+        return transporter
 
 class ParallelMode(Articulators):
     def _cpus(self, one_free=True):

@@ -1,16 +1,23 @@
 from typing import Any, List
 from rhprocessor.controls import DataStore, ULogger, PipeTransporterControl
 from rhprocessor.processor import Processor
-from rhprocessor.processor import BlockMode, FluxMode, Execute, Processor, ParallelMode
+from rhprocessor.processor import BlockMode, FluxMode, Execute, Processor, ParallelMode, ParallelFluxMode
 import time
 
 def carregar(dada: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: ULogger):
     logger.log('Iniciando carregar')
     time.sleep(1)
-    logger.log('Vou retornar')
-    return [0, 1, 2]
+    logger.log('Guardando valor no datastore')
+    _d = data_store.set_data('teste', [9,8,7,6,5,4])
+    logger.log(f'valor bool: {_d}')
+    return [0, 1, 2, 3, 4]
 
 def selecionar(data: Any, pipe_control: PipeTransporterControl, data_store: DataStore, logger: ULogger):
+    _val = data_store.get_data('teste')
+    logger.log(f'Valor do datastore: {_val}')
+    logger.log(f'Tentar colocar valor de outro tipo no datastore')
+    _t = data_store.set_data('teste', 'hahahah')
+    logger.log(f'Valor do datastore após tentativa: {_val}, {_t}')
     return data[0]
 
 
@@ -45,6 +52,10 @@ proc = Processor(
     BlockMode(
         Execute(carregar)
     ).set_name('Primeiro Bloco'),
+    ParallelFluxMode(
+        Execute(SomaFluxo(4)),
+        Execute(SubtraiFluxo(2))
+    ),
     ParallelMode(
         BlockMode(
             Execute(Soma(4)),
@@ -66,8 +77,10 @@ proc = Processor(
 
 import json
 
-print(json.dumps(proc.to_dict()))
+#print(json.dumps(proc.to_dict()))
 
+def change(_log):
+    print('LOG: ', _log)
 
 #proc.on_change(change)
 
@@ -83,35 +96,7 @@ print(json.dumps(proc.to_dict()))
 
 '''
 import time
-class Teste():
-    def __init__(self) -> None:
-        self._fn = None
-    def on_call(self, fn):
-        self._fn = fn
 
-    def __call__(self, ) -> Any:
-        time.sleep(1)
-        self._fn()
-        return [0,1,2]
-class Tt():
-    def disparar(self):
-        print('Disparei')
-
-t = Teste()
-tt = Tt()
-t.on_call(tt.disparar)
-print(t())
-
-
-
-
-class Teste():
-    def __init__(self, t1, t2) -> None:
-        pass
-
-print(Teste('k', 'ha').__init__.__code__.co_varnames)
-
-def change(_valor):
-    print('Valor', _valor)
 
 '''
+

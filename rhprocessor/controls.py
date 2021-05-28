@@ -62,12 +62,12 @@ class DataStore():
         assert isinstance(data, dict), 'Data must be a dict'
         self._data = {}
         self._protected = protected
-    def setKey(self, key, data) -> bool:
+    def set_data(self, key, data) -> bool:
         if not self._protected or not self._data.get(key) or type(self._data[key]) == type(data):
             self._data[key] = data
             return True
         return False
-    def getData(self, key):
+    def get_data(self, key):
         return self._data.get(key)
 
 class MetaError():
@@ -170,10 +170,7 @@ class NodeFunctions(MetaNode):
     def __init__(self, name: str, node_type: str) -> None:
         super().__init__(name, node_type)
         self._logs: List[str] = []
-    def to_dict(self):
-        _dct = super().to_dict()
-        _dct['logs'] = self._logs
-        return _dct
+    
 
 class Tracks():
     def __init__(self, dict_track = {}) -> None:
