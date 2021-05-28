@@ -5,6 +5,7 @@ from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool as ThreadPool
 from .controls import DataStore, ExecutionControl, Logger, MetaError, NodeStatus, PipeData, PipeTransporterControl, Transporter
 import traceback
+import json
 
 class Articulators():
     def __init__(self, *articulators) -> None:
@@ -19,6 +20,12 @@ class Articulators():
     @property
     def type(self):
         return type(self).__name__
+    def to_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'type': self.type,
+            'articulators': {k: v.to_dict() for k, v in enumerate(self._articulators)}
+        }
         
 
 class Execute():
@@ -38,6 +45,13 @@ class Execute():
     @property
     def type(self):
         return self._type
+    def to_dict(self):
+        _prm = self._function if isinstance(self._function, FunctionType) else self._function.__init__
+        return {
+            'name': self.name,
+            'type': self.type,
+            'parmas': _prm.__code__.co_varnames
+        }
 
     def __call__(self, transporter: Transporter) -> Transporter:
         if transporter.is_on_error():
@@ -166,5 +180,5 @@ class Processor(Articulators):
         return self._transporter.data().data
     def on_change(self, fn):
         self._fn = fn
-    
-        
+
+   

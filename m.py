@@ -64,16 +64,16 @@ proc = Processor(
     )
 )
 
-print(proc)
+import json
 
-def change(_valor):
-    print('Valor', _valor)
+print(json.dumps(proc.to_dict()))
+
 
 #proc.on_change(change)
 
 #proc()
 
-#import json
+
 #print('Retorno', proc.data())
 #print('Controle', json.dumps(proc._transporter.execution_control.tracks.to_dict()))
 #print('Logger', json.dumps(proc._transporter._logger.get_all_logs()))
@@ -101,4 +101,17 @@ t = Teste()
 tt = Tt()
 t.on_call(tt.disparar)
 print(t())
+
+
+
+
+class Teste():
+    def __init__(self, t1, t2) -> None:
+        pass
+
+print(Teste('k', 'ha').__init__.__code__.co_varnames)
+
+def change(_valor):
+    print('Valor', _valor)
+
 '''
