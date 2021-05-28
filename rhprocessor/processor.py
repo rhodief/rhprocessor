@@ -197,13 +197,16 @@ class Processor(Articulators):
     def __call__(self, transporter: Transporter = None) -> Transporter:
         if transporter: self._transporter = transporter
         _transporter = self._transporter
+        if transporter: transporter.check_in(self, len(self._articulators))
         for art in self._articulators:
             try:
                 _transporter = art(_transporter)
             except BaseException as e:
                 print('Ops ', e)
                 traceback.print_exc()
+        if transporter: transporter.check_out(status=NodeStatus.ERROR if transporter.is_on_error() else NodeStatus.SUCCESS)
         self._transporter = _transporter
+        return self._transporter
 
     def data(self):
         return self._transporter.data().data

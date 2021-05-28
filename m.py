@@ -1,3 +1,4 @@
+from multiprocessing.dummy import Process
 from typing import Any, List
 from rhprocessor.controls import DataStore, ULogger, PipeTransporterControl
 from rhprocessor.processor import Processor
@@ -48,7 +49,7 @@ class SubtraiFluxo():
         time.sleep(.2)
         return data - self._num
 
-proc = Processor(
+proc2 = Processor(
     BlockMode(
         Execute(carregar)
     ).set_name('Primeiro Bloco'),
@@ -66,6 +67,10 @@ proc = Processor(
             Execute(SubtraiFluxo(1))
         )
     ),
+)
+
+proc = Processor(
+    proc2,
     BlockMode(
         Execute(selecionar)
     ),
@@ -77,19 +82,19 @@ proc = Processor(
 
 import json
 
-#print(json.dumps(proc.to_dict()))
+print(json.dumps(proc.to_dict()))
 
 def change(_log):
     print('LOG: ', _log)
 
-#proc.on_change(change)
+proc.on_change(change)
 
-#proc()
+proc()
 
 
-#print('Retorno', proc.data())
-#print('Controle', json.dumps(proc._transporter.execution_control.tracks.to_dict()))
-#print('Logger', json.dumps(proc._transporter._logger.get_all_logs()))
+print('Retorno', proc.data())
+print('Controle', json.dumps(proc._transporter.execution_control.tracks.to_dict()))
+print('Logger', json.dumps(proc._transporter._logger.get_all_logs()))
 ### Fazer uma métodos em transporter para settar um erro...
 ###### Ele vai acessar o node respectivo para colocar o status erro.. 
 ###### Ele pode propagar-se por todo o pipeline e settar os respectivos status.. 
