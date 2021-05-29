@@ -3,7 +3,7 @@ from types import FunctionType
 from typing import Any, List
 from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool as ThreadPool
-from .controls import DataStore, ExecutionControl, Logger, MetaError, NodeStatus, PipeData, PipeTransporterControl, Transporter
+from .controls import DataStore, ExecutionControl, Logger, NodeStatus, PipeData, Transporter
 import traceback
 import json
 
@@ -197,14 +197,14 @@ class Processor(Articulators):
     def __call__(self, transporter: Transporter = None) -> Transporter:
         if transporter: self._transporter = transporter
         _transporter = self._transporter
-        if transporter: transporter.check_in(self, len(self._articulators))
+        _transporter.check_in(self, len(self._articulators))
         for art in self._articulators:
             try:
                 _transporter = art(_transporter)
             except BaseException as e:
                 print('Ops ', e)
                 traceback.print_exc()
-        if transporter: transporter.check_out(status=NodeStatus.ERROR if transporter.is_on_error() else NodeStatus.SUCCESS)
+        _transporter.check_out(status=NodeStatus.ERROR if _transporter.is_on_error() else NodeStatus.SUCCESS)
         self._transporter = _transporter
         return self._transporter
 

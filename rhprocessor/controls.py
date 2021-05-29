@@ -216,7 +216,14 @@ class ExecutionControl():
     def _get_key(self, node_id: List[int]):
         return '.'.join([str(n) for n in node_id])
 class Transporter():
-    def __init__(self, pipe_data: PipeData, data_store: DataStore, logger: Logger, execution_control: ExecutionControl, id = [-1], child_id = None):
+    def __init__(
+            self, pipe_data: PipeData, 
+            data_store: DataStore, 
+            logger: Logger, 
+            execution_control: ExecutionControl, 
+            id = [-1], child_id = None,
+            fn_move = None
+        ):
         self._pipe_data = pipe_data
         self._data_store = data_store
         self._logger = logger
@@ -226,7 +233,7 @@ class Transporter():
         self._start = None
         self._end = None
         self._error = isinstance(self._pipe_data.data, MetaError)
-        self._on_move_fn = None
+        self._on_move_fn = fn_move
     @property
     def execution_control(self):
         return self._execution_control
@@ -262,7 +269,7 @@ class Transporter():
         
     def _new_instance(self, d, num = None, pid = None):
         _id_list = self._id[:] if not pid else pid
-        return Transporter(PipeData(copy.deepcopy(d)), self._data_store, self._logger, self._execution_control, _id_list, num)
+        return Transporter(PipeData(copy.deepcopy(d)), self._data_store, self._logger, self._execution_control, _id_list, num, self._on_move_fn)
     def start(self):
         self._start = datetime.now()
         _id = self._id[:]

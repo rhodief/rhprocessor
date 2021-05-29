@@ -67,7 +67,7 @@ proc2 = Processor(
             Execute(SubtraiFluxo(1))
         )
     ),
-)
+).set_name('Projeto Intermediário')
 
 proc = Processor(
     proc2,
@@ -78,7 +78,7 @@ proc = Processor(
         Execute(SomaFluxo(100)),
         Execute(SubtraiFluxo(2))
     )
-)
+).set_name('Projeto Agnes')
 
 import json
 
