@@ -169,11 +169,6 @@ class ParallelMode(Articulators):
         return transporter
 
 
-
-
-import json
-import zmq
-
 class Processor(Articulators):
     def __init__(self, *articulators: List[Articulators]) -> None:
         super().__init__(*articulators)
@@ -182,6 +177,13 @@ class Processor(Articulators):
         def onChange():
             if  not callable(self._fn):
                 return
+            _ret =  {
+                'ids': [(k, v) for k, v in self._transporter._execution_control.current_node.items()],
+                'tracks': self._transporter.execution_control.tracks,
+                'logger': self._transporter.logger
+            }
+            self._fn(_ret)
+            '''
             _ids = [v for k, v in self._transporter._execution_control.current_node.items()]
             for _id in _ids:
                 _ret = {}
@@ -190,8 +192,8 @@ class Processor(Articulators):
                 _ret['control'] = self._transporter.execution_control.tracks.getNode(_id).to_dict()
                 if _lobj != None: 
                     _ret['log'] = [l.to_dict() for l in _lobj]
-                _teste = json.dumps(_ret).encode('ascii')
-                self._fn(_teste)
+                self._fn(_ret)
+            '''
         self._transporter.on_move(onChange)
 
     def __call__(self, transporter: Transporter = None) -> Transporter:

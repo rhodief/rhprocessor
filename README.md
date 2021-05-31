@@ -1,4 +1,8 @@
 # EM CONSTRUÇÃO ------
+## NOW
+1. Function to make log in terminal => n. GUI
+
+
 
 
 ## TODO

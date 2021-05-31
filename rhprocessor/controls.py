@@ -122,7 +122,6 @@ class MetaNode():
         self._end = value
     def set_status(self, status):
         if status not in [ns for ns in NodeStatus]:
-            print('Status', status)
             raise ValueError('Status not valid')
         self._status = status
     def to_dict(self):
