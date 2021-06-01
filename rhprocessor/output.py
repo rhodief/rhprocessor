@@ -28,6 +28,10 @@ def _current_execution(_data):
     }
     for k, _id in ids[:1]:
         _log = logger.get_log_obj(_id)
+        if _log != None:
+            _log_list = [l.to_dict()['txt'] for l in _log]
+            _ret['log_txt'] = _log_list[-1] if len(_log_list) > 0 else ''
+            pass
         _node = tracks.getNode(_id[:2]).to_dict()
         _node_type =_node['node_type']
         _fns = _node['tracks']
@@ -38,11 +42,12 @@ def _current_execution(_data):
             _ret['fn_num'] = _id[-1]
             _ret['fn_name'] = _fns[_id[-1]].get('name')
         elif _node_type in ['ParallelFluxMode', 'FluxMode']:
-            _len = len(_fns[0])
-            print('Len', _len)
-            ### Ao fazer o check-in em FluxMode ou ParallelFluxMode, o tranporter tem o dado e sabe se ele é iterable...
-            ### Se for, o que é esperado, ele guarda o o temanho dele no Node criado. Utilizo isso para fazer o progres.. 
-
+            _n_chld = _node.get('n_chld')
+            _n_func = len(_fns)
+            _n_exec = len(_fns[_n_func - 1])
+            _ret['fn_name'] = [ c[0]['name'] for i, c in _fns.items() if isinstance(c, dict) and c.get(0)]
+            _ret['log_flux_prog'] = int(_n_exec/_n_chld* 100)
+            #_ret['log_txt'] = 
         
         #_fn = tracks.getNode(_id).to_dict()
         #print('Fn', _fn)
@@ -102,7 +107,7 @@ def _print_current_execution(_ce):
     _fns = _ce.get('fn_name')
     func_txt = ''
     if isinstance(_fns, str): func_txt = '-> Function: n. ' + str(int(_ce.get('fn_num')) + 1) + ' - ' + _fns
-    elif isinstance(_fns, list): func_txt = '-> Function: ns. ' + ', '.join([n for n in _fns])
+    elif isinstance(_fns, list): func_txt = '-> Function: ns. ' + ', '.join([str(i + 1) + '. ' + n for i, n in enumerate(_fns)])
     console.addstr(header_height, 0, line_in_frame(txt=node_txt))
     console.addstr((header_height + 1), 0, line_in_frame(func_txt, padding=default_padding))
     console.addstr((header_height + 2), 0, line_in_frame(display_progress(_ce.get('log_flux_prog')), padding=default_padding))

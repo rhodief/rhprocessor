@@ -116,6 +116,7 @@ class MetaNode():
         self._start  = None
         self._end = None
         self._status = NodeStatus.AWAITING
+        self._n_chld = None
     def set_start(self, value):
         self._start = value
     def set_end(self, value):
@@ -124,13 +125,16 @@ class MetaNode():
         if status not in [ns for ns in NodeStatus]:
             raise ValueError('Status not valid')
         self._status = status
+    def set_n_chld(self, n_tracks):
+        self._n_chld = n_tracks
     def to_dict(self):
         return {
             'name': self._name,
             'node_type': self._node_type,
             'start': datetime.timestamp(self._start) if isinstance(self._start, datetime) else self._start,
             'end': datetime.timestamp(self._end) if isinstance(self._end, datetime) else self._end,
-            'status': self._status.name
+            'status': self._status.name,
+            'n_chld': self._n_chld
         }
 class Node(MetaNode):
     def __init__(self, name: str, node_type: str) -> None:
@@ -229,6 +233,7 @@ class Transporter():
         self._execution_control = execution_control
         self._id = id ## disabled
         self._child_id = child_id ### Quando se tornar filhos, ele tem um ID... 
+        self._n_children = None
         self._start = None
         self._end = None
         self._error = isinstance(self._pipe_data.data, MetaError)
@@ -259,6 +264,7 @@ class Transporter():
             return [self._new_instance(d, i) for i, d in enumerate([self._pipe_data.data])]
         if not isinstance(self._pipe_data.data, Iterable):
             raise ValueError('Data is not iterable')
+        self._n_children = len(self._pipe_data.data)
         return [self._new_instance(d, i) for i, d in enumerate(self._pipe_data.data)]
 
     def makeCopy(self, qnt: int):
@@ -269,6 +275,11 @@ class Transporter():
     def _new_instance(self, d, num = None, pid = None):
         _id_list = self._id[:] if not pid else pid
         return Transporter(PipeData(copy.deepcopy(d)), self._data_store, self._logger, self._execution_control, _id_list, num, self._on_move_fn)
+    def set_total_tracks(self):
+        _id = self._id[:-1]
+        node = self._execution_control._tracks.getNode(_id)
+        node.set_n_chld(self._n_children)
+
     def start(self):
         self._start = datetime.now()
         _id = self._id[:]

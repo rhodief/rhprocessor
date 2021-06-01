@@ -39,20 +39,24 @@ class SomaFluxo():
     def __init__(self, num = 10) -> None:
         self._num = num
     def __call__(self, data: int, pipe_control: PipeTransporterControl, data_store: DataStore, logger: ULogger) -> Any:
-        time.sleep(.3)
+        time.sleep(1)
         return data + self._num
 
 class SubtraiFluxo():
     def __init__(self, num = 3) -> None:
         self._num = num
     def __call__(self, data: int, pipe_control: PipeTransporterControl, data_store: DataStore, logger: ULogger) -> Any:
-        time.sleep(.2)
+        time.sleep(1)
         return data - self._num
 
 proc2 = Processor(
     BlockMode(
         Execute(carregar)
     ).set_name('Primeiro Bloco'),
+    FluxMode(
+        Execute(SomaFluxo(4)),
+        Execute(SubtraiFluxo(2))
+    ),
     ParallelFluxMode(
         Execute(SomaFluxo(4)),
         Execute(SubtraiFluxo(2))

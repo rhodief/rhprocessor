@@ -88,6 +88,7 @@ class FluxMode(Articulators):
     def __call__(self, transporter: Transporter) -> Transporter:
         transporter.check_in(self, len(self._articulators))
         chld_trans = transporter.make_children()
+        transporter.set_total_tracks()
         for chld in chld_trans:
             for art in self._articulators:
                 try:
@@ -114,6 +115,7 @@ class ParallelFluxMode(Articulators):
     def __call__(self, transporter: Transporter) -> Transporter:
         transporter.check_in(self, len(self._articulators))
         chld_trans = transporter.make_children()
+        transporter.set_total_tracks()
         def iter_thread(i):
             try:
                 for art in self._articulators:
