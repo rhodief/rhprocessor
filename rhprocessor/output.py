@@ -1,62 +1,88 @@
+import enum
+from typing import List
+from .controls import ACTION_TYPE, ExecutionControl, Logger
 from .processor import Processor
 import curses
+import time
+import json
+import datetime
 
 FRAME_WIDTH = 100
 APP_NAME = 'RhProcessor'
 proc_map = None
 
-
-def format_block_mode(data):
-    pass
-
-
-
-def _current_execution(_data):
-    ids = _data.get('ids', None)
-    tracks = _data.get('tracks', None)
-    logger = _data.get('logger', None)
-    if not isinstance(ids, list) or len(ids) < 1: return False
-    _ret = {
-        'n_num': 0,
-        'n_type': '',
-        'n_name': '',
-        'fn_num': 0,
-        'fn_name': '',
-        'log_flux_prog': None,
-        'log_txt': '',
-        'log_txt_prog': None
-    }
-    for k, _id in ids[:1]:
-        _log = logger.get_log_obj(_id)
-        if _log != None:
-            _log_list = [l.to_dict()['txt'] for l in _log]
-            _ret['log_txt'] = _log_list[-1] if len(_log_list) > 0 else ''
-            pass
-        _node = tracks.getNode(_id[:2]).to_dict()
-        _node_type =_node['node_type']
-        _fns = _node['tracks']
-        _ret['n_num'] = _id[1]
-        _ret['n_type'] = _node['node_type']
-        _ret['n_name'] = _node['name']
-        if _node_type == 'BlockMode':
-            _ret['fn_num'] = _id[-1]
-            _ret['fn_name'] = _fns[_id[-1]].get('name')
-        elif _node_type in ['ParallelFluxMode', 'FluxMode']:
-            _n_chld = _node.get('n_chld')
-            _n_func = len(_fns)
-            _n_exec = len(_fns[_n_func - 1])
-            _ret['fn_name'] = [ c[0]['name'] for i, c in _fns.items() if isinstance(c, dict) and c.get(0)]
-            _ret['log_flux_prog'] = int(_n_exec/_n_chld* 100)
-            #_ret['log_txt'] = 
+class Slot():
+    def __init__(self, node_dict: dict, logger: Logger, execution_control: ExecutionControl, ids: List[List[int]], current_id_string: str) -> None:
+        self._node = node_dict
+        self._logger = logger
+        self._execution_control = execution_control
+        self._ids = ids
+        self._slot = {}
+        self._current_id_string = current_id_string
+    def __call__(self) -> dict:
+        return self._digest()
+    def _digest(self):
+        self._slot['main_header'] = self._node.get('node_type', '').upper() + ': ' + self._node.get('name', '')
+        self._slot['sub_header'] = self._fns_to_string(self._node.get('tracks', {}))
+        _strt = datetime.datetime.fromtimestamp(self._node.get('start', ''))
+        self._slot['start'] = 'Start: ' + _strt.strftime('%d/%m/%Y, %H:%M:%S') + ' (' + str(datetime.datetime.now() - _strt) + ')'
+        if self._node.get('node_type') in ['FluxMode', 'ParallelFluxMode']:
+            _total = self._node.get('n_chld', None)
+            if _total != None:
+                n_fns = len(self._node.get('tracks'))
+                if n_fns > 0:
+                    _exec = len(self._node.get('tracks').get(n_fns - 1))
+                    self._slot['info'] = int(_exec/_total * 100)
         
-        #_fn = tracks.getNode(_id).to_dict()
-        #print('Fn', _fn)
-        #if _lobj != None: 
-        #    _ret['log'] = [l.to_dict() for l in _lobj]
-    return _ret   
+        if self._node.get('node_type') in ['BlockMode', 'FluxMode']:
+            _cids = self._current_id_string
+            _id_use = None
+            _up = -1 if self._node.get('node_type') == 'BlockMode' else - 2
+            for id in self._ids:
+                _id = self._execution_control._get_key_string(id[:_up])
+                if _id == _cids:
+                    _id_use = id
+                    break
+            if _id_use: 
+                logs = self._logger.get_log_obj(_id_use)
+                if isinstance(logs, list) and len(logs) > 0:
+                    self._slot['info_2'] = logs[-1].txt
+
+        return self._slot
+    def _fns_to_string(self, fns: dict):
+        _fns = []
+        for k, v in fns.items():
+            if not isinstance(v, dict):
+                continue
+            is_node = v.get('node_type')
+            if is_node:
+                _fns.append(v)
+            elif v.get(0) and isinstance(v.get(0), dict) and v.get(0).get('node_type'):
+                _fns.append(v[0])
+        _ret = []
+        for i, f in enumerate(_fns):
+            if isinstance(f, dict):
+                n = f.get('name', '')
+                n = f'{i}. {n}'
+                _ret.append(n)
+        if len(_ret) > 0: _ret[-1] = f'[{_ret[-1]}]'
+        return ' '.join(_ret)
+        '''
+        return {
+            'main_header': '',
+            'sub_header': '',
+            'status': '',
+            'duration': '',
+            'flux_progress': '',
+            'log': '',
+            'log_1': ''
+        }
+        '''
     
     
     
+#_node = tracks.getNode(_id[:2]).to_dict()
+#log = logger.get_log_obj(_id)
 
 def display_progress(progress: int):
     if progress == None:
@@ -85,7 +111,8 @@ def line_in_frame(txt = '', mask = ' ', start='|', end='|\n', align = 'left', pa
             _ms1 = (mask * _p)
             _ms2 = (mask * (_p - 1))
             line += _ms1 + txt + _ms2
-    else: line += txt + (mask * mask_space)
+    else: 
+        line += txt + (mask * mask_space)
     line += end
     line = (' ' * padding) + line
     return start + line
@@ -100,28 +127,41 @@ def _draw_header(name: str):
     console.addstr(line_in_frame())
     console.refresh()
 
-def _print_current_execution(_ce):
+is_printing = False
+def print_slots(_slots):
+    global is_printing
+    if is_printing:
+        return False
+    is_printing = True
+    console.clrtobot()
     default_padding = 5
     header_height = 5
-    node_txt = '=> Node n. ' + str(int(_ce.get('n_num')) + 1) + ' - ' + _ce.get('n_type') + ': ' + _ce.get('n_name')
-    _fns = _ce.get('fn_name')
-    func_txt = ''
-    if isinstance(_fns, str): func_txt = '-> Function: n. ' + str(int(_ce.get('fn_num')) + 1) + ' - ' + _fns
-    elif isinstance(_fns, list): func_txt = '-> Function: ns. ' + ', '.join([str(i + 1) + '. ' + n for i, n in enumerate(_fns)])
-    console.addstr(header_height, 0, line_in_frame(txt=node_txt))
-    console.addstr((header_height + 1), 0, line_in_frame(func_txt, padding=default_padding))
-    console.addstr((header_height + 2), 0, line_in_frame(display_progress(_ce.get('log_flux_prog')), padding=default_padding))
-    console.addstr((header_height + 3), 0, line_in_frame(txt='logs |  ' + _ce.get('log_txt'), padding=default_padding))
-    if _ce.get('log_txt_prog', None) != None: console.addstr((header_height + 4), 0, line_in_frame(txt='     |  ' + display_progress(_ce.get('log_txt_prog')), padding=default_padding))
-    console.refresh()
+    def _build_core(ce, lj = 0):
+        main_header = ce.get('main_header', '')
+        sub_header = ce.get('sub_header', '')
+        start = ce.get('start', '')
+        flux_progress = ce.get('info', '')
+        log = ce.get('info_2', '')
+        log_1 = ce.get('info_3', '')
+        console.addstr(header_height + ( 6 * lj), 0, line_in_frame(txt=main_header))
+        console.addstr((header_height + 1 + (6 * lj)), 0, line_in_frame(sub_header, padding=default_padding))
+        console.addstr((header_height + 2 + (6 * lj)), 0, line_in_frame(start, padding=default_padding))
+        console.addstr((header_height + 3 + (6 * lj)), 0, line_in_frame(display_progress(flux_progress) if flux_progress else '', padding=default_padding))
+        console.addstr((header_height + 4 + (6 * lj)), 0, line_in_frame(txt='logs |  ' + log, padding=default_padding))
+        console.addstr((header_height + 5 + (6 * lj)), 0, line_in_frame(txt='     |  ' + log_1, padding=default_padding))
+        
+    for i, s in enumerate(_slots):
+        _build_core(s(), i)
+        console.refresh()
+    is_printing = False
 
 def terminal_logger(processor: Processor):
     _draw_header(processor.name)
-    def _terminal_logger(_data):
-        _ce = _current_execution(_data)
-        if _ce == False: return False
-        _print_current_execution(_ce)
+    def _terminal_logger(execution_control: ExecutionControl, logger: Logger, action_type: ACTION_TYPE):
+        ids = [v for k, v in execution_control.current_nodes_id.items()]
+        slots = [Slot(v.to_dict(), logger, execution_control, ids, k) for k, v in execution_control.current_node.items()]
+        print_slots(slots)
     processor.on_change(_terminal_logger)
-    proc_map = processor.to_dict()
+    #proc_map = processor.to_dict()
     processor()
     curses.endwin()

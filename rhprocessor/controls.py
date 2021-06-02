@@ -4,6 +4,16 @@ import copy
 from enum import Enum, auto
 
 
+class ACTION_TYPE(Enum):
+    CHECKIN_NODE = auto()
+    CHECKIN_FN = auto()
+    START = auto()
+    END = auto()
+    CHECKOUT_FN = auto()
+    CHECKOUT_NODE = auto()
+    LOG = auto()
+
+
 class ILog():
     def __init__(self, txt) -> None:
         self._txt = txt
@@ -27,12 +37,12 @@ class ULogger():
     def log(self, msg):
         _o = ILog(msg)
         self._obj.append(_o)
-        self._notify()
+        self._notify(ACTION_TYPE.LOG)
 
     def logProgress(self, progress, total, msg):
         pass
-    def _notify(self):
-        if callable(self._fn): self._fn()
+    def _notify(self, action_type: ACTION_TYPE):
+        if callable(self._fn): self._fn(action_type)
 
 class Logger():
     def __init__(self) -> None:
@@ -201,11 +211,16 @@ class Tracks():
     def to_dict(self):
         return {k: v.to_dict() for k, v in self._tracks.items()}
 
+
 class ExecutionControl():
     def __init__(self, execution_data: dict = {}):
+        self._current_nodes_id = {}
         self._current_node = {}
         self._tracks = Tracks()
     
+    @property
+    def current_nodes_id(self):
+        return self._current_nodes_id
     @property
     def current_node(self):
         return self._current_node
@@ -213,11 +228,26 @@ class ExecutionControl():
     def tracks(self):
         return self._tracks
     def add_execution(self, node_id: List[int]):
-        self._current_node[self._get_key(node_id)] = node_id
+        self._current_nodes_id[self._get_key_string(node_id)] = node_id
     def remove_execution(self, node_id: List[int]):
-        self._current_node.pop(self._get_key(node_id), None)
-    def _get_key(self, node_id: List[int]):
+        self._current_nodes_id.pop(self._get_key_string(node_id), None)
+    def add_node(self, node_id: List[int], node):
+        _kr = None
+        for k, _ in self._current_node.items():
+            k_list = self._get_key_list(k)
+            if (self._is_child(k_list, node_id)):
+                _kr = k_list
+        if _kr: self.remove_node(k_list)
+        self._current_node[self._get_key_string(node_id)] = node
+    def remove_node(self, node_id: List[int]):
+        self._current_node.pop(self._get_key_string(node_id), None)
+    def _is_child(self, parent_id: List[int], child_id: List[int]):
+        _test_child = child_id[:-1]
+        return parent_id == _test_child
+    def _get_key_string(self, node_id: List[int]):
         return '.'.join([str(n) for n in node_id])
+    def _get_key_list(self, node_id_string: str):
+        return [int(n) for n in node_id_string.split('.')]
 class Transporter():
     def __init__(
             self, pipe_data: PipeData, 
@@ -246,19 +276,21 @@ class Transporter():
         return self._logger
     def check_in(self, articulator, fns_qnt = 0):
         self._id[-1] += 1
+        _id = self._id if self._child_id == None else self._id + [self._child_id]
         if fns_qnt:
             _inst = Node(articulator.name, articulator.type)
             _prev = None if articulator.type == 'BlockMode' else dict()
             _inst.set_tracks_position(fns_qnt, _prev)
             _inst.set_start(datetime.now())
             _inst.set_status(NodeStatus.RUNNING)
+            self._execution_control.add_node(_id, _inst)
         else:
             ## the children will use this.
             _inst = NodeFunctions(articulator.name, articulator.type)
-        _id = self._id if self._child_id == None else self._id + [self._child_id]
         self._execution_control._tracks.addNode(_id, _inst)
         if fns_qnt: self._id.append(-1)
-        self._notify()
+        type_node = ACTION_TYPE.CHECKIN_NODE if isinstance(_inst, Node) else ACTION_TYPE.CHECKIN_FN
+        self._notify(type_node)
     def make_children(self, qnt = None):
         if self._error or isinstance(self._pipe_data.data, MetaError):
             return [self._new_instance(d, i) for i, d in enumerate([self._pipe_data.data])]
@@ -288,7 +320,7 @@ class Transporter():
         node.set_start(self._start)
         node.set_status(NodeStatus.RUNNING)
         self._execution_control.add_execution(_id)
-        self._notify()
+        self._notify(ACTION_TYPE.START)
         
     
     def end(self, status = NodeStatus.SUCCESS):
@@ -299,7 +331,7 @@ class Transporter():
         node.set_end(self._end)
         node.set_status(status)
         self._execution_control.remove_execution(_id)
-        self._notify()
+        self._notify(ACTION_TYPE.END)
         
     
     def check_out(self, status = NodeStatus.SUCCESS):
@@ -307,7 +339,9 @@ class Transporter():
         node = self._execution_control._tracks.getNode(self._id)
         node.set_end(datetime.now())
         node.set_status(status)
-        self._notify()
+        self._execution_control.remove_node(self._id)
+        type_node = ACTION_TYPE.CHECKOUT_NODE if isinstance(node, Node) else ACTION_TYPE.CHECKOUT_FN
+        self._notify(type_node)
 
     def on_move(self, fn):
         self._on_move_fn = fn
@@ -333,8 +367,8 @@ class Transporter():
         _err = PipeTransporterControl().function_error(msg)
         self.receive_data(_err)
         self._error = True
-    def _notify(self):
-        if callable(self._on_move_fn): self._on_move_fn()
+    def _notify(self, action_type: ACTION_TYPE):
+        if callable(self._on_move_fn): self._on_move_fn(action_type)
 
 
 class ProcessorControls():

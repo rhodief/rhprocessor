@@ -3,7 +3,7 @@ from types import FunctionType
 from typing import Any, List
 from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool as ThreadPool
-from .controls import DataStore, ExecutionControl, Logger, NodeStatus, PipeData, Transporter
+from .controls import ACTION_TYPE, DataStore, ExecutionControl, Logger, NodeStatus, PipeData, Transporter
 import traceback
 import json
 
@@ -176,15 +176,18 @@ class Processor(Articulators):
         super().__init__(*articulators)
         self._transporter = Transporter(PipeData(), DataStore(), Logger(), ExecutionControl())
         self._fn = None
-        def onChange():
+        def onChange(action_type: ACTION_TYPE):
             if  not callable(self._fn):
                 return
+            '''
             _ret =  {
                 'ids': [(k, v) for k, v in self._transporter._execution_control.current_node.items()],
                 'tracks': self._transporter.execution_control.tracks,
-                'logger': self._transporter.logger
+                'logger': self._transporter.logger,
+                'type': action_type.name
             }
-            self._fn(_ret)
+            '''
+            self._fn(self._transporter.execution_control, self._transporter.logger, action_type)
             '''
             _ids = [v for k, v in self._transporter._execution_control.current_node.items()]
             for _id in _ids:
