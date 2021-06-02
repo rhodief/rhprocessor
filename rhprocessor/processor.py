@@ -5,7 +5,7 @@ from multiprocessing import cpu_count
 from multiprocessing.dummy import Pool as ThreadPool
 from .controls import ACTION_TYPE, DataStore, ExecutionControl, Logger, NodeStatus, PipeData, Transporter
 import traceback
-import json
+
 
 class Articulators():
     def __init__(self, *articulators) -> None:
