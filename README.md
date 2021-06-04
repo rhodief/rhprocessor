@@ -18,6 +18,17 @@ def do_something(dada: Any, pipe_control: PipeTransporterControl, data_store: Da
     time.sleep(1)
     return [0, 1, 2, 3, 4]
 
+## Class-version
+class Soma():
+    def __init__(self, num = 10) -> None:
+        self._num = num
+    def __call__(self, data: List[int], pipe_control: PipeTransporterControl, data_store: DataStore, logger: ULogger):
+        logger.log('Cheguei em Soma')
+        time.sleep(1)
+        logger.log('Vou somar cada elemento do array')
+        time.sleep(1)
+        return [d + self._num for d in data]
+
 ```
 
 

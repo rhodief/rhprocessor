@@ -370,8 +370,3 @@ class Transporter():
     def _notify(self, action_type: ACTION_TYPE):
         if callable(self._on_move_fn): self._on_move_fn(action_type)
 
-
-class ProcessorControls():
-    pass
-
-
